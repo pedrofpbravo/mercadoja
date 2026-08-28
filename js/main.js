@@ -20,6 +20,10 @@ import {
   validThresholds,
 } from "./logic.js";
 
+// Shown in Ajustes so anyone can tell which deploy a phone is running.
+// Keep in sync with CACHE in sw.js.
+const APP_VERSION = "v3";
+
 const $ = (id) => document.getElementById(id);
 
 // ---------- state ----------
@@ -643,7 +647,7 @@ function onSections(sections) {
 function onItems(items) {
   if (items.length === 0 && !state.seededItems) {
     state.seededItems = true;
-    db.seedDefaultItems().catch(() => {});
+    db.seedDefaultItems().catch(() => toast("Erro ao criar itens iniciais."));
     return;
   }
   const prev = state.itemsById;
@@ -870,6 +874,7 @@ function wire() {
 
 function boot() {
   wire();
+  $("app-version").textContent = `MercadoJá · ${APP_VERSION}`;
 
   // iOS install hint (login screen only, like 01. app)
   const standalone =
