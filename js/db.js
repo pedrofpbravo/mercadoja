@@ -126,7 +126,7 @@ export async function seedDefaultItems() {
       nameLower: normalize(name),
       sectionId: section,
       maxStock,
-      currentStock: maxStock,
+      currentStock: 0, // starts empty; the couple fills in real levels
       unit,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -165,7 +165,7 @@ export function deleteSection(id) {
 
 // ---------- items ----------
 
-export function createItem({ name, sectionId, maxStock, currentStock, unit }) {
+export function createItem({ name, sectionId, maxStock, currentStock, unit, note }) {
   const data = {
     name,
     nameLower: normalize(name),
@@ -176,10 +176,11 @@ export function createItem({ name, sectionId, maxStock, currentStock, unit }) {
     updatedAt: serverTimestamp(),
   };
   if (unit) data.unit = unit;
+  if (note) data.note = note;
   return setDoc(doc(collection(fs, "items")), data);
 }
 
-export function updateItem(id, { name, sectionId, maxStock, currentStock, unit }) {
+export function updateItem(id, { name, sectionId, maxStock, currentStock, unit, note }) {
   return updateDoc(doc(fs, "items", id), {
     name,
     nameLower: normalize(name),
@@ -187,8 +188,21 @@ export function updateItem(id, { name, sectionId, maxStock, currentStock, unit }
     maxStock,
     currentStock,
     unit: unit || null,
+    note: note || null,
     updatedAt: serverTimestamp(),
   });
+}
+
+// Sets currentStock = 0 on every item (Ajustes > "Zerar todo o estoque").
+// Batches cap at 500 ops, so chunk defensively.
+export async function zeroAllStocks(itemIds) {
+  for (let i = 0; i < itemIds.length; i += 400) {
+    const batch = writeBatch(fs);
+    itemIds.slice(i, i + 400).forEach((id) => {
+      batch.update(doc(fs, "items", id), { currentStock: 0, updatedAt: serverTimestamp() });
+    });
+    await batch.commit();
+  }
 }
 
 // Stepper tap: atomic increment, safe if both phones tap at once.
@@ -214,6 +228,7 @@ export function addEntriesForItems(items) {
     batch.set(doc(fs, "shoppingList", item.id), {
       itemId: item.id,
       name: item.name,
+      note: item.note || null,
       sectionId: item.sectionId,
       checked: false,
       addedAt: serverTimestamp(),

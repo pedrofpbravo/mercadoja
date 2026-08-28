@@ -60,7 +60,7 @@ input, select { font: inherit; }
 
 .field { display: block; margin: 0 0 14px; }
 .field > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
-.field input, .field select {
+.field input, .field select, .field textarea {
   width: 100%;
   padding: 12px 12px;
   border: 1px solid var(--line);
@@ -69,7 +69,8 @@ input, select { font: inherit; }
   color: var(--ink);
   appearance: none;
 }
-.field input:focus, .field select:focus { outline: 2px solid var(--brand); border-color: transparent; }
+.field textarea { resize: vertical; font: inherit; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--brand); border-color: transparent; }
 
 .field.inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .field.inline > span:first-child { font-size: 15px; color: var(--ink); margin: 0; display: flex; align-items: center; gap: 8px; }
@@ -216,7 +217,7 @@ input, select { font: inherit; }
 
 .item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .item-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item-qty { font-size: 13px; color: var(--muted); }
+.item-qty { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .stepper { display: flex; gap: 6px; flex: none; }
 .stepper button {
@@ -282,6 +283,7 @@ input, select { font: inherit; }
 .shop-name { font-weight: 600; }
 .shop-row.checked .shop-name { text-decoration: line-through; color: var(--muted); font-weight: 500; }
 .shop-tag { font-size: 12px; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
+.shop-note { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .shop-remove {
   flex: none;

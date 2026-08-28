@@ -121,6 +121,11 @@
         </div>
 
         <div class="card">
+          <button id="btn-zero-stock" class="btn ghost danger">Zerar todo o estoque</button>
+          <p class="hint center">Define o estoque atual de todos os itens como 0.</p>
+        </div>
+
+        <div class="card">
           <button id="btn-logout" class="btn ghost danger">Sair da conta</button>
         </div>
 
@@ -171,6 +176,10 @@
       <label class="field">
         <span>Unidade (opcional)</span>
         <input id="item-unit" maxlength="12" autocomplete="off" placeholder="ex.: un, kg, L">
+      </label>
+      <label class="field">
+        <span>Comentário (opcional)</span>
+        <textarea id="item-note" maxlength="200" rows="2" placeholder="ex.: marca preferida, tamanho, observações"></textarea>
       </label>
       <p id="item-error" class="form-error" hidden></p>
       <div class="sheet-actions">

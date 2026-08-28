@@ -22,7 +22,7 @@ import {
 
 // Shown in Ajustes so anyone can tell which deploy a phone is running.
 // Keep in sync with CACHE in sw.js.
-const APP_VERSION = "v3";
+const APP_VERSION = "v4";
 
 const $ = (id) => document.getElementById(id);
 
@@ -107,6 +107,11 @@ function selectionMode() {
 
 // ---------- stock list rendering ----------
 
+// Quantity line, with the item's comment (brand, size, etc.) appended.
+function qtyText(item) {
+  return qtyLabel(item) + (item.note ? ` · ${item.note}` : "");
+}
+
 function buildItemRow(item) {
   const li = document.createElement("li");
   li.className = "item-row";
@@ -135,7 +140,7 @@ function buildItemRow(item) {
   name.textContent = item.name;
   const qty = document.createElement("span");
   qty.className = "item-qty";
-  qty.textContent = qtyLabel(item);
+  qty.textContent = qtyText(item);
   main.append(name, qty);
 
   const stepper = document.createElement("div");
@@ -174,7 +179,7 @@ function patchItemRow(item) {
   const li = itemRowEls.get(item.id);
   if (!li) return;
   li.querySelector(".dot").className = `dot ${levelOf(item, state.thresholds)}`;
-  li.querySelector(".item-qty").textContent = qtyLabel(item);
+  li.querySelector(".item-qty").textContent = qtyText(item);
   li.querySelector(".stepper button").disabled = Number(item.currentStock) <= 0;
 }
 
@@ -304,6 +309,12 @@ function renderShop() {
         tag.textContent = "avulso";
         main.appendChild(tag);
       }
+      if (entry.note) {
+        const note = document.createElement("span");
+        note.className = "shop-note";
+        note.textContent = entry.note;
+        main.appendChild(note);
+      }
 
       const remove = document.createElement("button");
       remove.className = "shop-remove";
@@ -351,6 +362,7 @@ function openItemSheet(itemId) {
   $("item-max").value = item ? item.maxStock : "";
   $("item-current").value = item ? item.currentStock : "";
   $("item-unit").value = item ? item.unit || "" : "";
+  $("item-note").value = item ? item.note || "" : "";
   $("item-error").hidden = true;
   $("btn-item-delete").hidden = !item;
 
@@ -372,7 +384,14 @@ function submitItemForm(e) {
   }
   const currentStock = curRaw === "" ? maxStock : Math.max(0, Math.floor(Number(curRaw)) || 0);
 
-  const data = { name, sectionId, maxStock, currentStock, unit: $("item-unit").value.trim() };
+  const data = {
+    name,
+    sectionId,
+    maxStock,
+    currentStock,
+    unit: $("item-unit").value.trim(),
+    note: $("item-note").value.trim(),
+  };
   const op = state.editingItemId
     ? db.updateItem(state.editingItemId, data)
     : db.createItem(data);
@@ -666,6 +685,7 @@ function onItems(items) {
         old.sectionId !== it.sectionId ||
         old.maxStock !== it.maxStock ||
         (old.unit || "") !== (it.unit || "") ||
+        (old.note || "") !== (it.note || "") ||
         isVisible(old) !== isVisible(it)
       ) {
         structural = true;
@@ -855,6 +875,14 @@ function wire() {
     const maxOrder = state.sections.reduce((m, s) => Math.max(m, s.order ?? 0), -1);
     db.addSection(name, maxOrder + 1).catch(() => toast("Erro ao adicionar seção."));
     $("section-add-name").value = "";
+  });
+  $("btn-zero-stock").addEventListener("click", () => {
+    const n = state.items.length;
+    if (n === 0) return;
+    if (!confirm(`Zerar o estoque atual de todos os ${n} itens?`)) return;
+    db.zeroAllStocks(state.items.map((i) => i.id))
+      .then(() => toast("Estoque zerado."))
+      .catch(() => toast("Erro ao zerar o estoque."));
   });
   $("btn-logout").addEventListener("click", () => {
     if (confirm("Sair da conta neste aparelho?")) db.logout();

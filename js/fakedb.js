@@ -99,6 +99,12 @@ export async function bumpStock(iid, delta) {
   item.updatedAt = ts();
   emit.items();
 }
+export async function zeroAllStocks(itemIds) {
+  store.items.forEach((i) => {
+    if (itemIds.includes(i.id)) { i.currentStock = 0; i.updatedAt = ts(); }
+  });
+  emit.items();
+}
 export async function deleteItem(iid) {
   store.items = store.items.filter((i) => i.id !== iid);
   emit.items();
@@ -109,7 +115,7 @@ export async function addEntriesForItems(items) {
     const existing = store.entries.find((e) => e.id === item.id);
     if (existing) return;
     store.entries.push({
-      id: item.id, itemId: item.id, name: item.name,
+      id: item.id, itemId: item.id, name: item.name, note: item.note || null,
       sectionId: item.sectionId, checked: false, addedAt: ts(),
     });
   });
