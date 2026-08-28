@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// One shared household account: any authenticated user (i.e. the couple's
+// single login) can read and write everything; everyone else is denied.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

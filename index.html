@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MercadoJá</title>
+  <meta name="description" content="Estoque da casa e lista de compras do casal.">
+  <meta name="theme-color" content="#15803d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MercadoJá">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+  <div id="offline-banner" hidden>Sem conexão. As alterações serão sincronizadas depois.</div>
+
+  <!-- LOGIN -->
+  <section id="screen-login" class="screen" hidden>
+    <header class="brand">
+      <h1>Mercado<span>Já</span></h1>
+      <p class="tagline">Estoque da casa, sempre em dia.</p>
+    </header>
+
+    <div id="setup-warning" class="notice warn" hidden>
+      <strong>Configuração pendente</strong>
+      <p>As chaves do Firebase em <code>js/config.js</code> ainda precisam ser preenchidas. O app não funciona até lá. Veja o README.</p>
+    </div>
+
+    <form id="login-form" autocomplete="on">
+      <label class="field">
+        <span>E-mail</span>
+        <input id="login-email" type="email" autocomplete="username" required placeholder="casa@exemplo.com">
+      </label>
+      <label class="field">
+        <span>Senha</span>
+        <input id="login-password" type="password" autocomplete="current-password" required placeholder="••••••••">
+      </label>
+      <p id="login-error" class="form-error" hidden></p>
+      <button id="btn-login" class="btn primary" type="submit">Entrar</button>
+    </form>
+
+    <div id="install-card" class="notice install" hidden>
+      <strong>Adicione à tela de início</strong>
+      <p>No Safari, toque no botão <span class="share-glyph" aria-hidden="true"></span> Compartilhar e depois em <b>Adicionar à Tela de Início</b>.</p>
+    </div>
+  </section>
+
+  <!-- APP SHELL -->
+  <div id="app-shell" hidden>
+    <main id="tabs">
+
+      <!-- ESTOQUE -->
+      <section id="tab-estoque" class="tab">
+        <header class="tab-header">
+          <h2>Estoque</h2>
+          <input id="search-input" class="search" type="search" placeholder="Buscar item…" autocomplete="off">
+          <div class="chips" id="filter-chips">
+            <button class="chip pouco" data-level="pouco">Pouco</button>
+            <button class="chip medio" data-level="medio">Médio</button>
+            <button class="chip muito" data-level="muito">Muito</button>
+          </div>
+        </header>
+
+        <div id="selection-bar" class="selection-bar" hidden>
+          <label class="sel-all"><input id="select-all" type="checkbox"> Selecionar todos</label>
+          <button id="btn-add-selected" class="btn primary small" disabled>Adicionar à lista de compras</button>
+        </div>
+
+        <div id="stock-list" class="list"></div>
+        <p id="stock-empty" class="empty" hidden>Nenhum item ainda. Toque em ＋ para criar o primeiro.</p>
+        <p id="stock-no-results" class="empty" hidden>Nenhum item encontrado.</p>
+
+        <button id="fab-new-item" class="fab" aria-label="Novo item">＋</button>
+      </section>
+
+      <!-- COMPRAS -->
+      <section id="tab-compras" class="tab" hidden>
+        <header class="tab-header">
+          <h2>Lista de Compras</h2>
+          <button id="btn-avulso" class="btn ghost small">＋ Item avulso</button>
+        </header>
+
+        <div id="shop-list" class="list"></div>
+        <p id="shop-empty" class="empty" hidden>Lista vazia. Adicione itens pelo Estoque ou crie um item avulso.</p>
+
+        <div class="finish-wrap">
+          <button id="btn-finish" class="btn primary" hidden>Finalizar compra</button>
+        </div>
+      </section>
+
+      <!-- AJUSTES -->
+      <section id="tab-ajustes" class="tab" hidden>
+        <header class="tab-header"><h2>Ajustes</h2></header>
+
+        <h3 class="settings-h">Níveis de estoque</h3>
+        <div class="card">
+          <label class="field inline">
+            <span><span class="dot muito"></span> Muito acima de</span>
+            <span class="pct"><input id="th-muito" type="number" min="1" max="99" inputmode="numeric"> %</span>
+          </label>
+          <label class="field inline">
+            <span><span class="dot pouco"></span> Pouco abaixo de</span>
+            <span class="pct"><input id="th-pouco" type="number" min="1" max="99" inputmode="numeric"> %</span>
+          </label>
+          <p class="hint">Entre os dois valores o nível é <b>Médio</b> <span class="dot medio"></span>. Percentual do estoque máximo.</p>
+          <p id="th-error" class="form-error" hidden>O valor de Pouco precisa ser menor que o de Muito.</p>
+        </div>
+
+        <h3 class="settings-h">Seções do mercado</h3>
+        <div class="card">
+          <ul id="sections-list" class="sections"></ul>
+          <form id="section-add-form" class="section-add">
+            <input id="section-add-name" placeholder="Nova seção" autocomplete="off" maxlength="40">
+            <button class="btn small" type="submit">Adicionar</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <button id="btn-logout" class="btn ghost danger">Sair da conta</button>
+        </div>
+
+        <p class="version hint center">MercadoJá</p>
+      </section>
+    </main>
+
+    <!-- TAB BAR -->
+    <nav id="tabbar">
+      <button class="tabbtn active" data-tab="estoque">
+        <span class="tab-ico">▦</span>Estoque
+      </button>
+      <button class="tabbtn" data-tab="compras">
+        <span class="tab-ico">🛒</span>Compras
+        <span id="shop-badge" class="badge" hidden></span>
+      </button>
+      <button class="tabbtn" data-tab="ajustes">
+        <span class="tab-ico">⚙</span>Ajustes
+      </button>
+    </nav>
+  </div>
+
+  <!-- SHEETS -->
+  <div id="sheet-backdrop" hidden></div>
+
+  <!-- New / edit item -->
+  <div id="sheet-item" class="sheet" hidden>
+    <h3 id="sheet-item-title">Novo item</h3>
+    <form id="item-form">
+      <label class="field">
+        <span>Nome *</span>
+        <input id="item-name" required maxlength="60" autocomplete="off" placeholder="ex.: Leite integral">
+      </label>
+      <label class="field">
+        <span>Seção *</span>
+        <select id="item-section" required></select>
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Estoque máximo *</span>
+          <input id="item-max" type="number" min="1" step="1" inputmode="numeric" required placeholder="6">
+        </label>
+        <label class="field">
+          <span>Estoque atual</span>
+          <input id="item-current" type="number" min="0" step="1" inputmode="numeric" placeholder="= máximo">
+        </label>
+      </div>
+      <label class="field">
+        <span>Unidade (opcional)</span>
+        <input id="item-unit" maxlength="12" autocomplete="off" placeholder="ex.: un, kg, L">
+      </label>
+      <p id="item-error" class="form-error" hidden></p>
+      <div class="sheet-actions">
+        <button type="button" id="btn-item-delete" class="btn ghost danger" hidden>Excluir</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Item avulso -->
+  <div id="sheet-avulso" class="sheet" hidden>
+    <h3>Item avulso</h3>
+    <p class="hint">Entra só na lista de compras. Depois da compra dá para salvar na lista padrão.</p>
+    <form id="avulso-form">
+      <label class="field">
+        <span>Nome *</span>
+        <input id="avulso-name" required maxlength="60" autocomplete="off" placeholder="ex.: Carvão">
+      </label>
+      <label class="field">
+        <span>Seção *</span>
+        <select id="avulso-section" required></select>
+      </label>
+      <div class="sheet-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Adicionar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Finalizar compra -->
+  <div id="sheet-finish" class="sheet" hidden>
+    <h3>Finalizar compra</h3>
+    <p class="hint">Confira o novo estoque de cada item comprado. Já preenchemos com o máximo.</p>
+    <div id="finish-list"></div>
+    <div id="finish-unchecked" class="finish-unchecked" hidden>
+      <p><b id="finish-unchecked-count"></b> não marcados. Manter na lista?</p>
+      <div class="seg">
+        <label><input type="radio" name="keep-unchecked" value="keep" checked> Manter</label>
+        <label><input type="radio" name="keep-unchecked" value="clear"> Remover</label>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost" data-close>Cancelar</button>
+      <button type="button" id="btn-finish-confirm" class="btn primary">Confirmar</button>
+    </div>
+  </div>
+
+  <div id="toast" hidden></div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
