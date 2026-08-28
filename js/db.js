@@ -29,7 +29,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { firebaseConfig } from "./config.js";
-import { normalize, DEFAULT_SECTIONS, DEFAULT_THRESHOLDS } from "./logic.js";
+import { normalize, DEFAULT_SECTIONS, DEFAULT_THRESHOLDS, DEFAULT_ITEMS } from "./logic.js";
 
 let app = null;
 let auth = null;
@@ -111,6 +111,27 @@ export async function seedDefaults({ seedSections, seedThresholds }) {
       });
     });
   }
+  return batch.commit();
+}
+
+// Starter catalog, written once when /items is empty (same idempotency as
+// above: fixed doc ids, so two phones seeding at once do no harm). Also
+// creates the Carnes section the catalog needs.
+export async function seedDefaultItems() {
+  const batch = writeBatch(fs);
+  batch.set(doc(fs, "sections", "sec-carnes"), { name: "Carnes", order: 8 });
+  DEFAULT_ITEMS.forEach(({ name, section, maxStock, unit }) => {
+    batch.set(doc(fs, "items", `item-${normalize(name).replace(/\s+/g, "-")}`), {
+      name,
+      nameLower: normalize(name),
+      sectionId: section,
+      maxStock,
+      currentStock: maxStock,
+      unit,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  });
   return batch.commit();
 }
 

@@ -641,6 +641,11 @@ function onSections(sections) {
 }
 
 function onItems(items) {
+  if (items.length === 0 && !state.seededItems) {
+    state.seededItems = true;
+    db.seedDefaultItems().catch(() => {});
+    return;
+  }
   const prev = state.itemsById;
   state.items = items;
   state.itemsById = new Map(items.map((i) => [i.id, i]));

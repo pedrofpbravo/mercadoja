@@ -54,6 +54,7 @@ export function listenItems(cb) { listeners.items.push(cb); cb(store.items.map((
 export function listenShoppingList(cb) { listeners.entries.push(cb); cb(store.entries.map((e) => ({ ...e }))); }
 
 export async function seedDefaults() {}
+export async function seedDefaultItems() {}
 
 export async function saveThresholds(muitoMin, poucoMax) {
   store.thresholds = { muitoMin, poucoMax };

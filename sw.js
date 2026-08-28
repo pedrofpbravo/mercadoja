@@ -5,7 +5,7 @@
 //
 // DEPLOY RITUAL: bump CACHE below on every deploy.
 
-const CACHE = "mj-v1";
+const CACHE = "mj-v2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
