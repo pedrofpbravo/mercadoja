@@ -304,6 +304,27 @@ input, select { font: inherit; }
 }
 #btn-finish { box-shadow: 0 6px 16px rgba(21, 128, 61, 0.35); }
 
+/* ---------- receitas ---------- */
+.recipe-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  min-height: 54px;
+  justify-content: center;
+  cursor: pointer;
+}
+.recipe-row:last-child { border-bottom: none; }
+.recipe-name { font-weight: 600; }
+.recipe-excerpt {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ---------- settings ---------- */
 .settings-h { margin: 18px 2px 8px; font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
 .card {

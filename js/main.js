@@ -11,6 +11,7 @@ import * as fakeDb from "./fakedb.js";
 const db = location.hash === "#debug" ? fakeDb : realDb;
 import {
   DEFAULT_THRESHOLDS,
+  UNCAT_ID,
   levelOf,
   normalize,
   qtyLabel,
@@ -22,7 +23,7 @@ import {
 
 // Shown in Ajustes so anyone can tell which deploy a phone is running.
 // Keep in sync with CACHE in sw.js.
-const APP_VERSION = "v5";
+const APP_VERSION = "v6";
 
 const $ = (id) => document.getElementById(id);
 
@@ -34,12 +35,15 @@ const state = {
   items: [],
   itemsById: new Map(),
   entries: [],
+  recipes: [],
   tab: "estoque",
   search: "",
   filters: new Set(), // subset of {pouco, medio, muito}
   selected: new Set(), // itemIds while in selection mode
   collapsed: new Set(JSON.parse(localStorage.getItem("mj:collapsed") || "[]")),
   editingItemId: null,
+  editingRecipeId: null,
+  ensuredUncat: false,
   seededSections: false,
   seededThresholds: false,
   listenersStarted: false,
@@ -70,13 +74,24 @@ function closeSheets() {
 
 function fillSectionSelect(select, selectedId) {
   select.innerHTML = "";
-  state.sections.forEach((sec) => {
+  // "Não categorizado" comes first in the dropdown (it is the default for
+  // new items), even though the stock list shows it last.
+  const uncat = state.sections.find((s) => s.id === UNCAT_ID);
+  const ordered = uncat
+    ? [uncat, ...state.sections.filter((s) => s.id !== UNCAT_ID)]
+    : [...state.sections];
+  ordered.forEach((sec) => {
     const opt = document.createElement("option");
     opt.value = sec.id;
     opt.textContent = sec.name;
     if (sec.id === selectedId) opt.selected = true;
     select.appendChild(opt);
   });
+}
+
+// Default section for new items/avulsos: Não categorizado when it exists.
+function defaultSectionId() {
+  return state.sections.some((s) => s.id === UNCAT_ID) ? UNCAT_ID : state.sections[0]?.id;
 }
 
 function sectionName(id) {
@@ -357,7 +372,7 @@ function openItemSheet(itemId) {
   const item = itemId ? state.itemsById.get(itemId) : null;
 
   $("sheet-item-title").textContent = item ? "Editar item" : "Novo item";
-  fillSectionSelect($("item-section"), item ? item.sectionId : state.sections[0]?.id);
+  fillSectionSelect($("item-section"), item ? item.sectionId : defaultSectionId());
   $("item-name").value = item ? item.name : "";
   $("item-max").value = item ? item.maxStock : "";
   $("item-current").value = item ? item.currentStock : "";
@@ -551,6 +566,67 @@ function confirmFinish() {
   toast("Compra finalizada. Estoque atualizado.");
 }
 
+// ---------- receitas ----------
+
+function renderRecipes() {
+  const listEl = $("recipes-list");
+  listEl.innerHTML = "";
+
+  const sorted = [...state.recipes].sort((a, b) =>
+    (a.nameLower || "").localeCompare(b.nameLower || "", "pt")
+  );
+
+  if (sorted.length > 0) {
+    const ul = document.createElement("ul");
+    ul.className = "group-items";
+    sorted.forEach((r) => {
+      const li = document.createElement("li");
+      li.className = "recipe-row";
+
+      const name = document.createElement("span");
+      name.className = "recipe-name";
+      name.textContent = r.name;
+      li.appendChild(name);
+
+      const firstLine = (r.text || "").split("\n").find((l) => l.trim());
+      if (firstLine) {
+        const ex = document.createElement("span");
+        ex.className = "recipe-excerpt";
+        ex.textContent = firstLine.trim();
+        li.appendChild(ex);
+      }
+
+      li.addEventListener("click", () => openRecipeSheet(r.id));
+      ul.appendChild(li);
+    });
+    listEl.appendChild(ul);
+  }
+
+  $("recipes-empty").hidden = sorted.length > 0;
+}
+
+function openRecipeSheet(recipeId) {
+  state.editingRecipeId = recipeId || null;
+  const r = recipeId ? state.recipes.find((x) => x.id === recipeId) : null;
+  $("sheet-recipe-title").textContent = r ? "Editar receita" : "Nova receita";
+  $("recipe-name").value = r ? r.name : "";
+  $("recipe-text").value = r ? r.text || "" : "";
+  $("btn-recipe-delete").hidden = !r;
+  openSheet("sheet-recipe");
+}
+
+function submitRecipeForm(e) {
+  e.preventDefault();
+  const name = $("recipe-name").value.trim();
+  if (!name) return;
+  const data = { name, text: $("recipe-text").value.trim() };
+  const op = state.editingRecipeId
+    ? db.updateRecipe(state.editingRecipeId, data)
+    : db.createRecipe(data);
+  op.catch(() => toast("Erro ao salvar receita."));
+  closeSheets();
+}
+
 // ---------- ajustes ----------
 
 function renderSettings() {
@@ -581,6 +657,8 @@ function renderSectionsManager() {
   state.sections.forEach((sec, idx) => {
     const li = document.createElement("li");
     li.className = "section-row";
+    const isUncat = sec.id === UNCAT_ID;
+    const nextIsUncat = state.sections[idx + 1]?.id === UNCAT_ID;
 
     const nameInput = document.createElement("input");
     nameInput.type = "text";
@@ -598,7 +676,7 @@ function renderSectionsManager() {
     const up = document.createElement("button");
     up.className = "icon-btn";
     up.textContent = "▲";
-    up.disabled = idx === 0;
+    up.disabled = idx === 0 || isUncat;
     up.setAttribute("aria-label", "Mover para cima");
     up.addEventListener("click", () =>
       db.swapSectionOrder(sec, state.sections[idx - 1]).catch(() => toast("Erro ao reordenar."))
@@ -607,7 +685,7 @@ function renderSectionsManager() {
     const down = document.createElement("button");
     down.className = "icon-btn";
     down.textContent = "▼";
-    down.disabled = idx === state.sections.length - 1;
+    down.disabled = idx === state.sections.length - 1 || isUncat || nextIsUncat;
     down.setAttribute("aria-label", "Mover para baixo");
     down.addEventListener("click", () =>
       db.swapSectionOrder(sec, state.sections[idx + 1]).catch(() => toast("Erro ao reordenar."))
@@ -617,6 +695,7 @@ function renderSectionsManager() {
     del.className = "icon-btn del";
     del.textContent = "✕";
     del.setAttribute("aria-label", "Excluir seção");
+    del.disabled = isUncat; // fallback section cannot be removed
     del.addEventListener("click", () => {
       const count = state.items.filter((i) => i.sectionId === sec.id).length;
       if (count > 0) {
@@ -653,6 +732,13 @@ function buildBackup() {
       note: i.note || null,
       createdAt: iso(i.createdAt),
       updatedAt: iso(i.updatedAt),
+    })),
+    recipes: state.recipes.map((r) => ({
+      id: r.id,
+      name: r.name,
+      text: r.text || "",
+      createdAt: iso(r.createdAt),
+      updatedAt: iso(r.updatedAt),
     })),
     shoppingList: state.entries.map((e) => ({
       id: e.id,
@@ -744,6 +830,17 @@ function onSections(sections) {
   renderStock();
   renderShop();
   renderSectionsManager();
+  // Self-heal: databases created before v6 lack the pinned fallback section.
+  // Runs after the state update so the follow-up snapshot wins.
+  if (!sections.some((s) => s.id === UNCAT_ID) && !state.ensuredUncat) {
+    state.ensuredUncat = true;
+    db.ensureUncategorized().catch(() => {});
+  }
+}
+
+function onRecipes(recipes) {
+  state.recipes = recipes;
+  renderRecipes();
 }
 
 function onItems(items) {
@@ -824,6 +921,7 @@ function startListeners() {
   db.listenSections(onSections, err);
   db.listenItems(onItems, err);
   db.listenShoppingList(onEntries, err);
+  db.listenRecipes(onRecipes, err);
 }
 
 const LOGIN_ERRORS = {
@@ -931,7 +1029,7 @@ function wire() {
 
   // item avulso
   $("btn-avulso").addEventListener("click", () => {
-    fillSectionSelect($("avulso-section"), state.sections[0]?.id);
+    fillSectionSelect($("avulso-section"), defaultSectionId());
     $("avulso-name").value = "";
     openSheet("sheet-avulso");
   });
@@ -942,6 +1040,17 @@ function wire() {
     if (!name || !sectionId) return;
     db.addLooseEntry(name, sectionId).catch(() => toast("Erro ao adicionar."));
     closeSheets();
+  });
+
+  // receitas
+  $("fab-new-recipe").addEventListener("click", () => openRecipeSheet(null));
+  $("recipe-form").addEventListener("submit", submitRecipeForm);
+  $("btn-recipe-delete").addEventListener("click", () => {
+    const r = state.recipes.find((x) => x.id === state.editingRecipeId);
+    if (r && confirm(`Excluir a receita "${r.name}"?`)) {
+      db.deleteRecipe(r.id).catch(() => toast("Erro ao excluir."));
+      closeSheets();
+    }
   });
 
   // finalizar compra
@@ -955,7 +1064,9 @@ function wire() {
     e.preventDefault();
     const name = $("section-add-name").value.trim();
     if (!name) return;
-    const maxOrder = state.sections.reduce((m, s) => Math.max(m, s.order ?? 0), -1);
+    const maxOrder = state.sections
+      .filter((s) => s.id !== UNCAT_ID) // uncat's order (9999) stays last
+      .reduce((m, s) => Math.max(m, s.order ?? 0), -1);
     db.addSection(name, maxOrder + 1).catch(() => toast("Erro ao adicionar seção."));
     $("section-add-name").value = "";
   });

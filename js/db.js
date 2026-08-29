@@ -29,7 +29,14 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { firebaseConfig } from "./config.js";
-import { normalize, DEFAULT_SECTIONS, DEFAULT_THRESHOLDS, DEFAULT_ITEMS } from "./logic.js";
+import {
+  normalize,
+  DEFAULT_SECTIONS,
+  DEFAULT_THRESHOLDS,
+  DEFAULT_ITEMS,
+  UNCAT_ID,
+  UNCAT_NAME,
+} from "./logic.js";
 
 let app = null;
 let auth = null;
@@ -89,6 +96,12 @@ export function listenItems(cb, errCb) {
   }, errCb);
 }
 
+export function listenRecipes(cb, errCb) {
+  return onSnapshot(collection(fs, "recipes"), (snap) => {
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })), snap);
+  }, errCb);
+}
+
 export function listenShoppingList(cb, errCb) {
   return onSnapshot(collection(fs, "shoppingList"), (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })), snap);
@@ -133,6 +146,13 @@ export async function seedDefaultItems() {
     });
   });
   return batch.commit();
+}
+
+// Creates the pinned fallback section when it is missing (fixed id, so
+// concurrent calls from two phones are harmless). Called from the sections
+// listener, never unconditionally, so a later rename sticks.
+export function ensureUncategorized() {
+  return setDoc(doc(fs, "sections", UNCAT_ID), { name: UNCAT_NAME, order: 9999 });
 }
 
 // ---------- settings ----------
@@ -258,6 +278,31 @@ export function removeEntry(entryId) {
   return deleteDoc(doc(fs, "shoppingList", entryId));
 }
 
+// ---------- receitas ----------
+
+export function createRecipe({ name, text }) {
+  return setDoc(doc(collection(fs, "recipes")), {
+    name,
+    nameLower: normalize(name),
+    text: text || "",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export function updateRecipe(id, { name, text }) {
+  return updateDoc(doc(fs, "recipes", id), {
+    name,
+    nameLower: normalize(name),
+    text: text || "",
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export function deleteRecipe(id) {
+  return deleteDoc(doc(fs, "recipes", id));
+}
+
 // ---------- backup ----------
 // Restores a backup produced by "Exportar backup". Writes preserve the
 // original doc ids so sectionId/itemId references stay intact. Existing
@@ -292,6 +337,17 @@ export async function importBackup(data) {
       currentStock: Number(i.currentStock) || 0,
       unit: i.unit || null,
       note: i.note || null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }]);
+  });
+
+  (data.recipes || []).forEach((r) => {
+    if (!r.id || !r.name) return;
+    writes.push([doc(fs, "recipes", r.id), {
+      name: r.name,
+      nameLower: normalize(r.name),
+      text: r.text || "",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }]);

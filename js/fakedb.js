@@ -2,7 +2,7 @@
 // (same idea as 01. app's #debug-* screens): lets both lists and the whole
 // finalizar-compra flow be exercised locally with sample data, no Firebase.
 
-import { DEFAULT_SECTIONS, DEFAULT_THRESHOLDS, normalize } from "./logic.js";
+import { DEFAULT_SECTIONS, DEFAULT_THRESHOLDS, normalize, UNCAT_ID, UNCAT_NAME } from "./logic.js";
 
 const ts = () => ({ toMillis: () => Date.now() });
 let nextId = 1;
@@ -13,8 +13,22 @@ const store = {
   sections: DEFAULT_SECTIONS.map((name, i) => ({ id: id("sec"), name, order: i })),
   items: [],
   entries: [],
+  recipes: [],
   archive: [],
 };
+
+store.recipes.push(
+  {
+    id: id("recipe"), name: "Strogonoff de frango", nameLower: "strogonoff de frango",
+    text: "Frango, creme de leite, molho de tomate, champignon.\nRefogar o frango, juntar o molho e o creme.",
+    createdAt: ts(), updatedAt: ts(),
+  },
+  {
+    id: id("recipe"), name: "Arroz de forno", nameLower: "arroz de forno",
+    text: "Arroz cozido, queijo, presunto.\nMontar em camadas e gratinar.",
+    createdAt: ts(), updatedAt: ts(),
+  }
+);
 
 // sample items across levels
 const S = store.sections;
@@ -34,12 +48,13 @@ const S = store.sections;
   });
 });
 
-const listeners = { settings: [], sections: [], items: [], entries: [] };
+const listeners = { settings: [], sections: [], items: [], entries: [], recipes: [] };
 const emit = {
   settings: () => listeners.settings.forEach((cb) => cb({ ...store.thresholds })),
   sections: () => listeners.sections.forEach((cb) => cb(store.sections.map((s) => ({ ...s })))),
   items: () => listeners.items.forEach((cb) => cb(store.items.map((i) => ({ ...i })))),
   entries: () => listeners.entries.forEach((cb) => cb(store.entries.map((e) => ({ ...e })))),
+  recipes: () => listeners.recipes.forEach((cb) => cb(store.recipes.map((r) => ({ ...r })))),
 };
 
 export const isConfigured = () => true;
@@ -52,9 +67,35 @@ export function listenSettings(cb) { listeners.settings.push(cb); cb({ ...store.
 export function listenSections(cb) { listeners.sections.push(cb); cb(store.sections.map((s) => ({ ...s }))); }
 export function listenItems(cb) { listeners.items.push(cb); cb(store.items.map((i) => ({ ...i }))); }
 export function listenShoppingList(cb) { listeners.entries.push(cb); cb(store.entries.map((e) => ({ ...e }))); }
+export function listenRecipes(cb) { listeners.recipes.push(cb); cb(store.recipes.map((r) => ({ ...r }))); }
 
 export async function seedDefaults() {}
 export async function seedDefaultItems() {}
+
+export async function ensureUncategorized() {
+  if (!store.sections.some((s) => s.id === UNCAT_ID)) {
+    store.sections.push({ id: UNCAT_ID, name: UNCAT_NAME, order: 9999 });
+    emit.sections();
+  }
+}
+
+export async function createRecipe({ name, text }) {
+  store.recipes.push({
+    id: id("recipe"), name, nameLower: normalize(name), text: text || "",
+    createdAt: ts(), updatedAt: ts(),
+  });
+  emit.recipes();
+}
+export async function updateRecipe(rid, { name, text }) {
+  Object.assign(store.recipes.find((r) => r.id === rid), {
+    name, nameLower: normalize(name), text: text || "", updatedAt: ts(),
+  });
+  emit.recipes();
+}
+export async function deleteRecipe(rid) {
+  store.recipes = store.recipes.filter((r) => r.id !== rid);
+  emit.recipes();
+}
 
 export async function saveThresholds(muitoMin, poucoMax) {
   store.thresholds = { muitoMin, poucoMax };
@@ -151,7 +192,13 @@ export async function importBackup(data) {
     if (cur) Object.assign(cur, d);
     else store.items.push(d);
   });
-  emit.settings(); emit.sections(); emit.items(); emit.entries();
+  (data.recipes || []).forEach((r) => {
+    const d = { ...r, nameLower: normalize(r.name), createdAt: ts(), updatedAt: ts() };
+    const cur = store.recipes.find((x) => x.id === r.id);
+    if (cur) Object.assign(cur, d);
+    else store.recipes.push(d);
+  });
+  emit.settings(); emit.sections(); emit.items(); emit.entries(); emit.recipes();
 }
 
 export async function finishTrip({ stockUpdates, promotions, archiveEntries, removeEntryIds }) {

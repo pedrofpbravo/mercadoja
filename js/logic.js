@@ -3,6 +3,11 @@
 
 export const DEFAULT_THRESHOLDS = { muitoMin: 0.66, poucoMax: 0.33 };
 
+// Fallback section for items created without a real category. It is the
+// default pick in the new-item form and is always displayed last.
+export const UNCAT_ID = "sec-nao-categorizado";
+export const UNCAT_NAME = "Não categorizado";
+
 export const DEFAULT_SECTIONS = [
   "Hortifruti",
   "Laticínios",
@@ -101,11 +106,15 @@ export function qtyLabel(item) {
   return `${item.currentStock} / ${item.maxStock}${unit}`;
 }
 
-// Stable sort of sections by order, then name.
+// Stable sort of sections by order, then name. "Não categorizado" is
+// pinned to the end regardless of its stored order.
 export function sortSections(sections) {
-  return [...sections].sort(
+  const sorted = [...sections].sort(
     (a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name, "pt")
   );
+  const i = sorted.findIndex((s) => s.id === UNCAT_ID);
+  if (i >= 0) sorted.push(...sorted.splice(i, 1));
+  return sorted;
 }
 
 export function sortItems(items) {

@@ -93,6 +93,18 @@
         </div>
       </section>
 
+      <!-- RECEITAS -->
+      <section id="tab-receitas" class="tab" hidden>
+        <header class="tab-header">
+          <h2>Receitas</h2>
+        </header>
+
+        <div id="recipes-list" class="list"></div>
+        <p id="recipes-empty" class="empty" hidden>Nenhuma receita ainda. Toque em ＋ para cadastrar a primeira.</p>
+
+        <button id="fab-new-recipe" class="fab" aria-label="Nova receita">＋</button>
+      </section>
+
       <!-- AJUSTES -->
       <section id="tab-ajustes" class="tab" hidden>
         <header class="tab-header"><h2>Ajustes</h2></header>
@@ -149,6 +161,9 @@
       <button class="tabbtn" data-tab="compras">
         <span class="tab-ico">🛒</span>Compras
         <span id="shop-badge" class="badge" hidden></span>
+      </button>
+      <button class="tabbtn" data-tab="receitas">
+        <span class="tab-ico">📖</span>Receitas
       </button>
       <button class="tabbtn" data-tab="ajustes">
         <span class="tab-ico">⚙</span>Ajustes
@@ -216,6 +231,27 @@
         <span class="spacer"></span>
         <button type="button" class="btn ghost" data-close>Cancelar</button>
         <button type="submit" class="btn primary">Adicionar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Nova / editar receita -->
+  <div id="sheet-recipe" class="sheet" hidden>
+    <h3 id="sheet-recipe-title">Nova receita</h3>
+    <form id="recipe-form">
+      <label class="field">
+        <span>Nome *</span>
+        <input id="recipe-name" required maxlength="80" autocomplete="off" placeholder="ex.: Strogonoff de frango">
+      </label>
+      <label class="field">
+        <span>Receita</span>
+        <textarea id="recipe-text" rows="10" placeholder="Ingredientes e modo de preparo…"></textarea>
+      </label>
+      <div class="sheet-actions">
+        <button type="button" id="btn-recipe-delete" class="btn ghost danger" hidden>Excluir</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
       </div>
     </form>
   </div>
