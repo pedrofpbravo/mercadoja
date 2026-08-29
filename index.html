@@ -244,9 +244,18 @@
         <input id="recipe-name" required maxlength="80" autocomplete="off" placeholder="ex.: Strogonoff de frango">
       </label>
       <label class="field">
-        <span>Receita</span>
-        <textarea id="recipe-text" rows="10" placeholder="Ingredientes e modo de preparo…"></textarea>
+        <span>Receita (texto livre)</span>
+        <textarea id="recipe-text" rows="8" placeholder="Ingredientes e modo de preparo…"></textarea>
       </label>
+      <div class="field">
+        <span>Ingredientes do estoque (opcional)</span>
+        <div id="rec-ing-list" class="ing-list"></div>
+        <div class="ing-picker">
+          <input id="rec-ing-search" placeholder="Buscar item do estoque…" autocomplete="off">
+          <div id="rec-ing-results" class="ing-results" hidden></div>
+        </div>
+      </div>
+      <button type="button" id="btn-rec-to-list" class="btn small" hidden>Adicionar ingredientes à lista de compras</button>
       <div class="sheet-actions">
         <button type="button" id="btn-recipe-delete" class="btn ghost danger" hidden>Excluir</button>
         <span class="spacer"></span>

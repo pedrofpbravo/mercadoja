@@ -280,21 +280,30 @@ export function removeEntry(entryId) {
 
 // ---------- receitas ----------
 
-export function createRecipe({ name, text }) {
+// ingredients: [{ itemId, name }] — itemId is the stock item's unique doc
+// id; name is a display snapshot used if the item is later deleted.
+const cleanIngredients = (list) =>
+  (Array.isArray(list) ? list : [])
+    .filter((i) => i && i.itemId && i.name)
+    .map(({ itemId, name }) => ({ itemId, name }));
+
+export function createRecipe({ name, text, ingredients }) {
   return setDoc(doc(collection(fs, "recipes")), {
     name,
     nameLower: normalize(name),
     text: text || "",
+    ingredients: cleanIngredients(ingredients),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
 }
 
-export function updateRecipe(id, { name, text }) {
+export function updateRecipe(id, { name, text, ingredients }) {
   return updateDoc(doc(fs, "recipes", id), {
     name,
     nameLower: normalize(name),
     text: text || "",
+    ingredients: cleanIngredients(ingredients),
     updatedAt: serverTimestamp(),
   });
 }
@@ -348,6 +357,7 @@ export async function importBackup(data) {
       name: r.name,
       nameLower: normalize(r.name),
       text: r.text || "",
+      ingredients: cleanIngredients(r.ingredients),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }]);

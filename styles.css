@@ -325,6 +325,56 @@ input, select { font: inherit; }
   text-overflow: ellipsis;
 }
 
+/* recipe ingredients */
+.ing-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
+.ing-list:empty { margin: 0; }
+.ing-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 6px 5px 11px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ing-chip .dot { width: 9px; height: 9px; }
+.ing-chip button {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+}
+.dot.none { background: #cbd5d1; }
+
+.ing-picker { position: relative; }
+.ing-results {
+  position: absolute;
+  left: 0; right: 0;
+  top: calc(100% + 4px);
+  z-index: 5;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.ing-result {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.ing-result:last-child { border-bottom: none; }
+.ing-result .sec { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+#btn-rec-to-list { margin-bottom: 4px; }
+
 /* ---------- settings ---------- */
 .settings-h { margin: 18px 2px 8px; font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
 .card {

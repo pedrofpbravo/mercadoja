@@ -79,16 +79,17 @@ export async function ensureUncategorized() {
   }
 }
 
-export async function createRecipe({ name, text }) {
+export async function createRecipe({ name, text, ingredients }) {
   store.recipes.push({
     id: id("recipe"), name, nameLower: normalize(name), text: text || "",
-    createdAt: ts(), updatedAt: ts(),
+    ingredients: ingredients || [], createdAt: ts(), updatedAt: ts(),
   });
   emit.recipes();
 }
-export async function updateRecipe(rid, { name, text }) {
+export async function updateRecipe(rid, { name, text, ingredients }) {
   Object.assign(store.recipes.find((r) => r.id === rid), {
-    name, nameLower: normalize(name), text: text || "", updatedAt: ts(),
+    name, nameLower: normalize(name), text: text || "",
+    ingredients: ingredients || [], updatedAt: ts(),
   });
   emit.recipes();
 }

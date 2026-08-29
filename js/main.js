@@ -23,7 +23,7 @@ import {
 
 // Shown in Ajustes so anyone can tell which deploy a phone is running.
 // Keep in sync with CACHE in sw.js.
-const APP_VERSION = "v6";
+const APP_VERSION = "v7";
 
 const $ = (id) => document.getElementById(id);
 
@@ -43,6 +43,7 @@ const state = {
   collapsed: new Set(JSON.parse(localStorage.getItem("mj:collapsed") || "[]")),
   editingItemId: null,
   editingRecipeId: null,
+  draftIngredients: [], // [{itemId, name}] while the recipe sheet is open
   ensuredUncat: false,
   seededSections: false,
   seededThresholds: false,
@@ -588,11 +589,15 @@ function renderRecipes() {
       name.textContent = r.name;
       li.appendChild(name);
 
+      const parts = [];
+      const nIng = (r.ingredients || []).length;
+      if (nIng > 0) parts.push(`${nIng} ${nIng === 1 ? "ingrediente" : "ingredientes"}`);
       const firstLine = (r.text || "").split("\n").find((l) => l.trim());
-      if (firstLine) {
+      if (firstLine) parts.push(firstLine.trim());
+      if (parts.length > 0) {
         const ex = document.createElement("span");
         ex.className = "recipe-excerpt";
-        ex.textContent = firstLine.trim();
+        ex.textContent = parts.join(" · ");
         li.appendChild(ex);
       }
 
@@ -611,15 +616,90 @@ function openRecipeSheet(recipeId) {
   $("sheet-recipe-title").textContent = r ? "Editar receita" : "Nova receita";
   $("recipe-name").value = r ? r.name : "";
   $("recipe-text").value = r ? r.text || "" : "";
+  state.draftIngredients = (r?.ingredients || []).map(({ itemId, name }) => ({ itemId, name }));
+  $("rec-ing-search").value = "";
+  $("rec-ing-results").hidden = true;
+  renderDraftIngredients();
   $("btn-recipe-delete").hidden = !r;
   openSheet("sheet-recipe");
+}
+
+function renderDraftIngredients() {
+  const wrap = $("rec-ing-list");
+  wrap.innerHTML = "";
+  state.draftIngredients.forEach((ing, idx) => {
+    const item = state.itemsById.get(ing.itemId);
+    const chip = document.createElement("span");
+    chip.className = "ing-chip";
+
+    const dot = document.createElement("span");
+    dot.className = `dot ${item ? levelOf(item, state.thresholds) : "none"}`;
+
+    const label = document.createElement("span");
+    label.textContent = item ? item.name : ing.name;
+
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.textContent = "✕";
+    rm.setAttribute("aria-label", `Remover ${ing.name}`);
+    rm.addEventListener("click", () => {
+      state.draftIngredients.splice(idx, 1);
+      renderDraftIngredients();
+    });
+
+    chip.append(dot, label, rm);
+    wrap.appendChild(chip);
+  });
+  $("btn-rec-to-list").hidden = state.draftIngredients.length === 0;
+}
+
+function renderIngResults() {
+  const box = $("rec-ing-results");
+  const q = normalize($("rec-ing-search").value);
+  box.innerHTML = "";
+  const chosen = new Set(state.draftIngredients.map((i) => i.itemId));
+  const matches = q
+    ? state.items
+        .filter((i) => !chosen.has(i.id) && (i.nameLower || normalize(i.name)).includes(q))
+        .slice(0, 6)
+    : [];
+  box.hidden = matches.length === 0;
+  matches.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "ing-result";
+
+    const dot = document.createElement("span");
+    dot.className = `dot ${levelOf(item, state.thresholds)}`;
+    const name = document.createElement("span");
+    name.textContent = item.name;
+    const sec = document.createElement("span");
+    sec.className = "sec";
+    sec.textContent = sectionName(item.sectionId);
+
+    // pointerdown beats the input's blur, so the tap always lands
+    row.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      state.draftIngredients.push({ itemId: item.id, name: item.name });
+      $("rec-ing-search").value = "";
+      box.hidden = true;
+      renderDraftIngredients();
+      $("rec-ing-search").focus();
+    });
+
+    row.append(dot, name, sec);
+    box.appendChild(row);
+  });
 }
 
 function submitRecipeForm(e) {
   e.preventDefault();
   const name = $("recipe-name").value.trim();
   if (!name) return;
-  const data = { name, text: $("recipe-text").value.trim() };
+  const data = {
+    name,
+    text: $("recipe-text").value.trim(),
+    ingredients: state.draftIngredients,
+  };
   const op = state.editingRecipeId
     ? db.updateRecipe(state.editingRecipeId, data)
     : db.createRecipe(data);
@@ -737,6 +817,7 @@ function buildBackup() {
       id: r.id,
       name: r.name,
       text: r.text || "",
+      ingredients: (r.ingredients || []).map(({ itemId, name }) => ({ itemId, name })),
       createdAt: iso(r.createdAt),
       updatedAt: iso(r.updatedAt),
     })),
@@ -1045,6 +1126,33 @@ function wire() {
   // receitas
   $("fab-new-recipe").addEventListener("click", () => openRecipeSheet(null));
   $("recipe-form").addEventListener("submit", submitRecipeForm);
+  $("rec-ing-search").addEventListener("input", renderIngResults);
+  $("rec-ing-search").addEventListener("keydown", (e) => {
+    // Enter picks the first suggestion instead of submitting the form
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const first = $("rec-ing-results").querySelector(".ing-result");
+    if (first) first.dispatchEvent(new PointerEvent("pointerdown", { cancelable: true }));
+  });
+  $("rec-ing-search").addEventListener("blur", () => {
+    setTimeout(() => ($("rec-ing-results").hidden = true), 200);
+  });
+  $("btn-rec-to-list").addEventListener("click", () => {
+    const already = new Set(state.entries.filter((e) => e.itemId).map((e) => e.itemId));
+    const toAdd = state.draftIngredients
+      .map((i) => state.itemsById.get(i.itemId))
+      .filter((it) => it && !already.has(it.id));
+    const skipped = state.draftIngredients.length - toAdd.length;
+    if (toAdd.length > 0) {
+      db.addEntriesForItems(toAdd).catch(() => toast("Erro ao adicionar."));
+    }
+    toast(
+      toAdd.length === 0
+        ? "Todos os ingredientes já estavam na lista."
+        : `${toAdd.length} ${toAdd.length === 1 ? "ingrediente adicionado" : "ingredientes adicionados"} à lista de compras` +
+          (skipped > 0 ? ` (${skipped} já na lista)` : "")
+    );
+  });
   $("btn-recipe-delete").addEventListener("click", () => {
     const r = state.recipes.find((x) => x.id === state.editingRecipeId);
     if (r && confirm(`Excluir a receita "${r.name}"?`)) {
