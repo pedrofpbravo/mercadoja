@@ -258,6 +258,64 @@ export function removeEntry(entryId) {
   return deleteDoc(doc(fs, "shoppingList", entryId));
 }
 
+// ---------- backup ----------
+// Restores a backup produced by "Exportar backup". Writes preserve the
+// original doc ids so sectionId/itemId references stay intact. Existing
+// docs with the same id are overwritten; extra docs are left alone
+// (non-destructive merge). Chunked to respect the 500-op batch limit.
+export async function importBackup(data) {
+  const writes = [];
+
+  if (
+    data.thresholds &&
+    Number.isFinite(data.thresholds.muitoMin) &&
+    Number.isFinite(data.thresholds.poucoMax)
+  ) {
+    writes.push([doc(fs, "settings", "thresholds"), {
+      muitoMin: data.thresholds.muitoMin,
+      poucoMax: data.thresholds.poucoMax,
+    }]);
+  }
+
+  (data.sections || []).forEach((s) => {
+    if (!s.id || !s.name) return;
+    writes.push([doc(fs, "sections", s.id), { name: s.name, order: s.order ?? 0 }]);
+  });
+
+  (data.items || []).forEach((i) => {
+    if (!i.id || !i.name) return;
+    writes.push([doc(fs, "items", i.id), {
+      name: i.name,
+      nameLower: normalize(i.name),
+      sectionId: i.sectionId,
+      maxStock: Number(i.maxStock) || 1,
+      currentStock: Number(i.currentStock) || 0,
+      unit: i.unit || null,
+      note: i.note || null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }]);
+  });
+
+  (data.shoppingList || []).forEach((e) => {
+    if (!e.id || !e.name) return;
+    writes.push([doc(fs, "shoppingList", e.id), {
+      itemId: e.itemId || null,
+      name: e.name,
+      note: e.note || null,
+      sectionId: e.sectionId,
+      checked: !!e.checked,
+      addedAt: serverTimestamp(),
+    }]);
+  });
+
+  for (let i = 0; i < writes.length; i += 400) {
+    const batch = writeBatch(fs);
+    writes.slice(i, i + 400).forEach(([ref, d]) => batch.set(ref, d));
+    await batch.commit();
+  }
+}
+
 // ---------- finalizar compra ----------
 // One batch: update stocks, optionally promote avulsos to items, archive the
 // trip snapshot, clear checked entries (and unchecked too if asked).

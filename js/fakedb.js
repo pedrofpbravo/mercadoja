@@ -138,6 +138,22 @@ export async function removeEntry(eid) {
   emit.entries();
 }
 
+export async function importBackup(data) {
+  if (data.thresholds) store.thresholds = { ...data.thresholds };
+  (data.sections || []).forEach((s) => {
+    const cur = store.sections.find((x) => x.id === s.id);
+    if (cur) Object.assign(cur, { name: s.name, order: s.order ?? 0 });
+    else store.sections.push({ id: s.id, name: s.name, order: s.order ?? 0 });
+  });
+  (data.items || []).forEach((i) => {
+    const d = { ...i, nameLower: normalize(i.name), createdAt: ts(), updatedAt: ts() };
+    const cur = store.items.find((x) => x.id === i.id);
+    if (cur) Object.assign(cur, d);
+    else store.items.push(d);
+  });
+  emit.settings(); emit.sections(); emit.items(); emit.entries();
+}
+
 export async function finishTrip({ stockUpdates, promotions, archiveEntries, removeEntryIds }) {
   stockUpdates.forEach(({ itemId, newStock }) => {
     const item = store.items.find((i) => i.id === itemId);

@@ -6,7 +6,7 @@
 // DEPLOY RITUAL: bump CACHE below on every deploy.
 
 // Keep in sync with APP_VERSION in js/main.js.
-const CACHE = "mj-v4";
+const CACHE = "mj-v5";
 
 self.addEventListener("install", () => {
   self.skipWaiting();

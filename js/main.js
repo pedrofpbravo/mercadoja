@@ -22,7 +22,7 @@ import {
 
 // Shown in Ajustes so anyone can tell which deploy a phone is running.
 // Keep in sync with CACHE in sw.js.
-const APP_VERSION = "v4";
+const APP_VERSION = "v5";
 
 const $ = (id) => document.getElementById(id);
 
@@ -633,6 +633,89 @@ function renderSectionsManager() {
   });
 }
 
+// ---------- backup ----------
+
+function buildBackup() {
+  const iso = (t) => (t && typeof t.toDate === "function" ? t.toDate().toISOString() : null);
+  return {
+    app: "MercadoJá",
+    version: APP_VERSION,
+    exportedAt: new Date().toISOString(),
+    thresholds: { ...state.thresholds },
+    sections: state.sections.map(({ id, name, order }) => ({ id, name, order })),
+    items: state.items.map((i) => ({
+      id: i.id,
+      name: i.name,
+      sectionId: i.sectionId,
+      maxStock: i.maxStock,
+      currentStock: i.currentStock,
+      unit: i.unit || null,
+      note: i.note || null,
+      createdAt: iso(i.createdAt),
+      updatedAt: iso(i.updatedAt),
+    })),
+    shoppingList: state.entries.map((e) => ({
+      id: e.id,
+      itemId: e.itemId || null,
+      name: e.name,
+      note: e.note || null,
+      sectionId: e.sectionId,
+      checked: !!e.checked,
+      addedAt: iso(e.addedAt),
+    })),
+  };
+}
+
+async function exportBackup() {
+  const data = buildBackup();
+  const json = JSON.stringify(data, null, 2);
+  const filename = `mercadoja-backup-${data.exportedAt.slice(0, 10)}.json`;
+
+  // iOS standalone: the share sheet ("Salvar em Arquivos") is the reliable
+  // path; plain downloads are flaky there. Elsewhere, a regular download.
+  const file = new File([json], filename, { type: "application/json" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch (ex) {
+      if (ex.name === "AbortError") return; // user closed the sheet
+      // fall through to download
+    }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  toast("Backup exportado.");
+}
+
+function importBackupFile(file) {
+  file
+    .text()
+    .then((text) => {
+      const data = JSON.parse(text);
+      if (!data || !Array.isArray(data.items) || !Array.isArray(data.sections)) {
+        throw new Error("formato");
+      }
+      const when = (data.exportedAt || "").slice(0, 10) || "data desconhecida";
+      if (
+        !confirm(
+          `Importar backup de ${when}?\n${data.items.length} itens e ${data.sections.length} seções serão restaurados. Itens atuais com o mesmo id serão sobrescritos; nada é apagado.`
+        )
+      ) {
+        return;
+      }
+      db.importBackup(data)
+        .then(() => toast("Backup restaurado."))
+        .catch(() => toast("Erro ao restaurar o backup."));
+    })
+    .catch(() => toast("Arquivo de backup inválido."));
+}
+
 // ---------- snapshot handlers ----------
 
 function onSettings(data) {
@@ -876,6 +959,15 @@ function wire() {
     db.addSection(name, maxOrder + 1).catch(() => toast("Erro ao adicionar seção."));
     $("section-add-name").value = "";
   });
+  // backup
+  $("btn-export").addEventListener("click", exportBackup);
+  $("btn-import").addEventListener("click", () => $("import-file").click());
+  $("import-file").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (file) importBackupFile(file);
+  });
+
   $("btn-zero-stock").addEventListener("click", () => {
     const n = state.items.length;
     if (n === 0) return;
@@ -903,6 +995,7 @@ function wire() {
 function boot() {
   wire();
   $("app-version").textContent = `MercadoJá · ${APP_VERSION}`;
+  if (db === fakeDb) window.__buildBackup = buildBackup; // #debug test hook
 
   // iOS install hint (login screen only, like 01. app)
   const standalone =

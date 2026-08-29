@@ -313,7 +313,8 @@ input, select { font: inherit; }
   padding: 14px;
   margin-bottom: 14px;
 }
-.card .btn.ghost.danger { width: 100%; }
+.card .btn { width: 100%; }
+.card .btn + .btn { margin-top: 8px; }
 
 .sections { list-style: none; margin: 0 0 12px; padding: 0; }
 .section-row {
@@ -346,6 +347,7 @@ input, select { font: inherit; }
 .section-row .icon-btn:disabled { opacity: 0.25; }
 
 .section-add { display: flex; gap: 8px; }
+.section-add .btn { width: auto; }
 .section-add input {
   flex: 1;
   min-width: 0;
