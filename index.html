@@ -82,11 +82,11 @@
       <section id="tab-compras" class="tab" hidden>
         <header class="tab-header">
           <h2>Lista de Compras</h2>
-          <button id="btn-avulso" class="btn ghost small">＋ Item avulso</button>
+          <button id="btn-avulso" class="btn ghost small">＋ Adicionar item</button>
         </header>
 
         <div id="shop-list" class="list"></div>
-        <p id="shop-empty" class="empty" hidden>Lista vazia. Adicione itens pelo Estoque ou crie um item avulso.</p>
+        <p id="shop-empty" class="empty" hidden>Lista vazia. Adicione itens pelo Estoque ou crie um item.</p>
 
         <div class="finish-wrap">
           <button id="btn-finish" class="btn primary" hidden>Finalizar compra</button>
@@ -214,19 +214,19 @@
     </form>
   </div>
 
-  <!-- Item avulso -->
+  <!-- Adicionar item -->
   <div id="sheet-avulso" class="sheet" hidden>
-    <h3>Item avulso</h3>
-    <p class="hint">Entra só na lista de compras. Depois da compra dá para salvar na lista padrão.</p>
-    <form id="avulso-form">
+    <h3>Adicionar item</h3>
+    <p class="hint">O item entra na lista de compras e é cadastrado no Estoque em <b>Não categorizado</b>, com estoque máximo 1. Dá para ajustar depois na aba Estoque.</p>
+    <form id="avulso-form" novalidate>
       <label class="field">
         <span>Nome *</span>
-        <input id="avulso-name" required maxlength="60" autocomplete="off" placeholder="ex.: Carvão">
+        <div class="ing-picker">
+          <input id="avulso-name" required maxlength="60" autocomplete="off" placeholder="ex.: Carvão">
+          <div id="avulso-results" class="ing-results" hidden></div>
+        </div>
       </label>
-      <label class="field">
-        <span>Seção *</span>
-        <select id="avulso-section" required></select>
-      </label>
+      <p id="avulso-error" class="form-error" hidden></p>
       <div class="sheet-actions">
         <span class="spacer"></span>
         <button type="button" class="btn ghost" data-close>Cancelar</button>

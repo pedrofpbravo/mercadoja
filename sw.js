@@ -6,7 +6,7 @@
 // DEPLOY RITUAL: bump CACHE below on every deploy.
 
 // Keep in sync with APP_VERSION in js/main.js.
-const CACHE = "mj-v7";
+const CACHE = "mj-v9";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -32,7 +32,7 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET" || !cacheable) return;
 
   // cache: "no-cache" revalidates with the server (ETag/304) instead of
-  // trusting the HTTP cache — GitHub Pages serves 10-min max-age, which
+  // trusting the HTTP cache, GitHub Pages serves 10-min max-age, which
   // otherwise keeps phones on a stale version right after a deploy.
   event.respondWith(
     fetch(event.request, { cache: "no-cache" })

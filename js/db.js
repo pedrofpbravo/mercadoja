@@ -200,6 +200,29 @@ export function createItem({ name, sectionId, maxStock, currentStock, unit, note
   return setDoc(doc(collection(fs, "items")), data);
 }
 
+export function createItemWithEntry({ name, sectionId, maxStock }) {
+  const batch = writeBatch(fs);
+  const itemRef = doc(collection(fs, "items"));
+  batch.set(itemRef, {
+    name,
+    nameLower: normalize(name),
+    sectionId,
+    maxStock,
+    currentStock: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(doc(fs, "shoppingList", itemRef.id), {
+    itemId: itemRef.id,
+    name,
+    note: null,
+    sectionId,
+    checked: false,
+    addedAt: serverTimestamp(),
+  });
+  return batch.commit();
+}
+
 export function updateItem(id, { name, sectionId, maxStock, currentStock, unit, note }) {
   return updateDoc(doc(fs, "items", id), {
     name,
@@ -257,17 +280,6 @@ export function addEntriesForItems(items) {
   return batch.commit();
 }
 
-// Item avulso: random entry id, itemId = null.
-export function addLooseEntry(name, sectionId) {
-  return setDoc(doc(collection(fs, "shoppingList")), {
-    itemId: null,
-    name,
-    sectionId,
-    checked: false,
-    addedAt: serverTimestamp(),
-  });
-}
-
 export function setEntryChecked(entryId, checked) {
   const data = { checked };
   data.checkedAt = checked ? serverTimestamp() : null;
@@ -280,7 +292,7 @@ export function removeEntry(entryId) {
 
 // ---------- receitas ----------
 
-// ingredients: [{ itemId, name }] — itemId is the stock item's unique doc
+// ingredients: [{ itemId, name }], itemId is the stock item's unique doc
 // id; name is a display snapshot used if the item is later deleted.
 const cleanIngredients = (list) =>
   (Array.isArray(list) ? list : [])

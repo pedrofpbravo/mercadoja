@@ -1,4 +1,4 @@
-// MercadoJá — UI layer. Same architecture as 01. app: one main module,
+// MercadoJá: UI layer. Same architecture as 01. app: one main module,
 // direct DOM, hash-free tab navigation, optimistic writes through db.js.
 // Firestore's local cache gives latency compensation: every write below
 // fires the relevant onSnapshot immediately, so the UI re-renders from a
@@ -23,7 +23,7 @@ import {
 
 // Shown in Ajustes so anyone can tell which deploy a phone is running.
 // Keep in sync with CACHE in sw.js.
-const APP_VERSION = "v7";
+const APP_VERSION = "v9";
 
 const $ = (id) => document.getElementById(id);
 
@@ -90,7 +90,7 @@ function fillSectionSelect(select, selectedId) {
   });
 }
 
-// Default section for new items/avulsos: Não categorizado when it exists.
+// Default section for new items: Não categorizado when it exists.
 function defaultSectionId() {
   return state.sections.some((s) => s.id === UNCAT_ID) ? UNCAT_ID : state.sections[0]?.id;
 }
@@ -121,6 +121,57 @@ function selectionMode() {
   return state.filters.size > 0;
 }
 
+function itemIsOnShoppingList(itemId) {
+  return state.entries.some((entry) => entry.itemId === itemId);
+}
+
+function updateItemCartButton(li, itemId) {
+  const button = li?.querySelector(".item-cart");
+  if (!button) return;
+  const onList = itemIsOnShoppingList(itemId);
+  button.classList.toggle("on", onList);
+  button.setAttribute(
+    "aria-label",
+    onList ? "Item já está na lista de compras" : "Adicionar à lista de compras"
+  );
+}
+
+function addExistingItemToShoppingList(item, closeAfter = false) {
+  if (itemIsOnShoppingList(item.id)) {
+    toast("Já está na lista de compras.");
+    if (closeAfter) closeSheets();
+    return;
+  }
+  db.addEntriesForItems([item]).catch(() => toast("Erro ao adicionar."));
+  toast("Adicionado à lista de compras.");
+  if (closeAfter) closeSheets();
+}
+
+// Swipe action: on the list it comes off, off the list it goes on. Same
+// write path as the cart button, so both stay in sync through onEntries.
+function toggleItemOnShoppingList(itemId, li) {
+  const item = state.itemsById.get(itemId);
+  if (!item) return;
+  const entry = state.entries.find((e) => e.itemId === itemId);
+  if (entry) {
+    db.removeEntry(entry.id).catch(() => toast("Erro ao remover."));
+    toast("Removido da lista de compras.");
+  } else {
+    db.addEntriesForItems([item]).catch(() => toast("Erro ao adicionar."));
+    toast("Adicionado à lista de compras.");
+  }
+  flashRow(li, !!entry);
+}
+
+function flashRow(li, removing) {
+  if (!li) return;
+  const cls = removing ? "flash-off" : "flash-on";
+  li.classList.remove("flash-on", "flash-off");
+  void li.offsetWidth; // restart the animation when swiping twice in a row
+  li.classList.add(cls);
+  setTimeout(() => li.classList.remove(cls), 500);
+}
+
 // ---------- stock list rendering ----------
 
 // Quantity line, with the item's comment (brand, size, etc.) appended.
@@ -128,10 +179,94 @@ function qtyText(item) {
   return qtyLabel(item) + (item.note ? ` · ${item.note}` : "");
 }
 
+// Slide the row left past the trigger to add it to (or remove it from) the
+// shopping list. Pure shortcut: the cart button does the same in one tap and
+// stays the discoverable, desktop-friendly path.
+const SWIPE_MAX = 104; // furthest the row travels
+const SWIPE_TRIGGER = 64; // release past this and the action fires
+let suppressClickUntil = 0; // a finished swipe must not open the edit sheet
+
+function attachRowSwipe(li, fg, itemId) {
+  const label = li.querySelector(".row-bg-label");
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let dx = 0;
+  let tracking = false;
+  let dragging = false;
+
+  const reset = () => {
+    fg.classList.add("snap");
+    fg.style.transform = "";
+    li.classList.remove("swiping", "armed", "removing");
+    tracking = false;
+    dragging = false;
+    pointerId = null;
+    dx = 0;
+  };
+
+  fg.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    // Stepper, cart and checkbox keep their own taps.
+    if (e.target.closest("button, input, label")) return;
+    pointerId = e.pointerId;
+    startX = e.clientX;
+    startY = e.clientY;
+    dx = 0;
+    tracking = true;
+    dragging = false;
+    fg.classList.remove("snap");
+  });
+
+  fg.addEventListener("pointermove", (e) => {
+    if (!tracking || e.pointerId !== pointerId) return;
+    const mx = e.clientX - startX;
+    const my = e.clientY - startY;
+    if (!dragging) {
+      if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+      if (Math.abs(mx) <= Math.abs(my)) {
+        tracking = false; // vertical scroll wins
+        return;
+      }
+      dragging = true;
+      const onList = itemIsOnShoppingList(itemId);
+      li.classList.toggle("removing", onList);
+      label.textContent = onList ? "Remover" : "Adicionar";
+      li.classList.add("swiping");
+      try {
+        fg.setPointerCapture(pointerId);
+      } catch (ex) {
+        /* pointer capture is best effort */
+      }
+    }
+    dx = Math.max(-SWIPE_MAX, Math.min(0, mx));
+    fg.style.transform = `translateX(${dx}px)`;
+    li.classList.toggle("armed", dx <= -SWIPE_TRIGGER);
+  });
+
+  const finish = (e) => {
+    if (!tracking || e.pointerId !== pointerId) return;
+    const fired = dragging && dx <= -SWIPE_TRIGGER;
+    if (dragging) suppressClickUntil = Date.now() + 400;
+    reset();
+    if (fired) toggleItemOnShoppingList(itemId, li);
+  };
+  fg.addEventListener("pointerup", finish);
+  fg.addEventListener("pointercancel", finish);
+}
+
 function buildItemRow(item) {
   const li = document.createElement("li");
   li.className = "item-row";
   li.dataset.id = item.id;
+
+  // Revealed behind the row while it is dragged left.
+  const bg = document.createElement("div");
+  bg.className = "row-bg";
+  bg.innerHTML = '<span class="row-bg-label"></span>';
+
+  const fg = document.createElement("div");
+  fg.className = "row-fg";
 
   const sel = document.createElement("label");
   sel.className = "sel";
@@ -177,7 +312,17 @@ function buildItemRow(item) {
   });
   stepper.append(dec, inc);
 
-  li.addEventListener("click", () => {
+  const cart = document.createElement("button");
+  cart.type = "button";
+  cart.className = "item-cart";
+  cart.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1"></circle><circle cx="19" cy="20" r="1"></circle><path d="M3 4h2l2.4 10.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 7H6"></path></svg>';
+  cart.addEventListener("click", (e) => {
+    e.stopPropagation();
+    addExistingItemToShoppingList(item);
+  });
+
+  fg.addEventListener("click", () => {
+    if (Date.now() < suppressClickUntil) return; // the tap ended a swipe
     if (selectionMode()) {
       cb.checked = !cb.checked;
       cb.dispatchEvent(new Event("change"));
@@ -186,7 +331,10 @@ function buildItemRow(item) {
     }
   });
 
-  li.append(sel, dot, main, stepper);
+  fg.append(sel, dot, main, cart, stepper);
+  li.append(bg, fg);
+  attachRowSwipe(li, fg, item.id);
+  updateItemCartButton(li, item.id);
   return li;
 }
 
@@ -691,6 +839,82 @@ function renderIngResults() {
   });
 }
 
+function renderAvulsoResults() {
+  const box = $("avulso-results");
+  const q = normalize($("avulso-name").value);
+  box.innerHTML = "";
+  const matches = q
+    ? state.items
+        .filter((item) => (item.nameLower || normalize(item.name)).includes(q))
+        .slice(0, 6)
+    : [];
+  box.hidden = matches.length === 0;
+  matches.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "ing-result";
+
+    const dot = document.createElement("span");
+    dot.className = `dot ${levelOf(item, state.thresholds)}`;
+    const name = document.createElement("span");
+    name.textContent = item.name;
+    const sec = document.createElement("span");
+    sec.className = "sec";
+    sec.textContent = sectionName(item.sectionId);
+
+    // pointerdown happens before blur, so the tap always lands
+    row.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      addExistingItemToShoppingList(item, true);
+    });
+
+    row.append(dot, name, sec);
+    box.appendChild(row);
+  });
+}
+
+// Estoque máximo de um item criado pela lista de compras. Ele nasce em Não
+// categorizado com estoque atual 0, então já aparece como Pouco; nome, seção
+// e máximo podem ser ajustados depois na aba Estoque.
+const AVULSO_MAX_STOCK = 1;
+
+async function submitAvulsoForm(e) {
+  e.preventDefault();
+  const name = $("avulso-name").value.trim();
+  const errEl = $("avulso-error");
+
+  if (!name) {
+    errEl.textContent = "Preencha o nome do item.";
+    errEl.hidden = false;
+    return;
+  }
+
+  const normalizedName = normalize(name);
+  const existing = state.items.find(
+    (item) => (item.nameLower || normalize(item.name)) === normalizedName
+  );
+  if (existing) {
+    addExistingItemToShoppingList(existing, true);
+    return;
+  }
+
+  closeSheets();
+  toast("Item criado em Não categorizado e adicionado à lista.");
+  try {
+    // The sections listener self-heals old databases, but a new item cannot
+    // wait for it: create the fallback section first when it is missing.
+    if (!state.sections.some((s) => s.id === UNCAT_ID)) {
+      await db.ensureUncategorized();
+    }
+    await db.createItemWithEntry({
+      name,
+      sectionId: UNCAT_ID,
+      maxStock: AVULSO_MAX_STOCK,
+    });
+  } catch (ex) {
+    toast("Erro ao criar item.");
+  }
+}
+
 function submitRecipeForm(e) {
   e.preventDefault();
   const name = $("recipe-name").value.trim();
@@ -968,6 +1192,7 @@ function onItems(items) {
 function onEntries(entries) {
   state.entries = entries;
   renderShop();
+  itemRowEls.forEach((li, itemId) => updateItemCartButton(li, itemId));
 }
 
 // ---------- tabs ----------
@@ -1108,19 +1333,27 @@ function wire() {
     }
   });
 
-  // item avulso
+  // adicionar item pela lista de compras
   $("btn-avulso").addEventListener("click", () => {
-    fillSectionSelect($("avulso-section"), defaultSectionId());
     $("avulso-name").value = "";
+    $("avulso-error").hidden = true;
+    $("avulso-results").hidden = true;
     openSheet("sheet-avulso");
   });
-  $("avulso-form").addEventListener("submit", (e) => {
+  $("avulso-form").addEventListener("submit", submitAvulsoForm);
+  $("avulso-name").addEventListener("input", () => {
+    $("avulso-error").hidden = true;
+    renderAvulsoResults();
+  });
+  $("avulso-name").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const first = $("avulso-results").querySelector(".ing-result");
+    if (!first) return;
     e.preventDefault();
-    const name = $("avulso-name").value.trim();
-    const sectionId = $("avulso-section").value;
-    if (!name || !sectionId) return;
-    db.addLooseEntry(name, sectionId).catch(() => toast("Erro ao adicionar."));
-    closeSheets();
+    first.dispatchEvent(new PointerEvent("pointerdown", { cancelable: true }));
+  });
+  $("avulso-name").addEventListener("blur", () => {
+    setTimeout(() => ($("avulso-results").hidden = true), 200);
   });
 
   // receitas

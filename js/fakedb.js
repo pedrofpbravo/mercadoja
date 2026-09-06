@@ -129,6 +129,19 @@ export async function createItem(data) {
   });
   emit.items();
 }
+export async function createItemWithEntry({ name, sectionId, maxStock }) {
+  const iid = id("item");
+  store.items.push({
+    id: iid, name, nameLower: normalize(name), sectionId, maxStock,
+    currentStock: 0, createdAt: ts(), updatedAt: ts(),
+  });
+  store.entries.push({
+    id: iid, itemId: iid, name, note: null, sectionId,
+    checked: false, addedAt: ts(),
+  });
+  emit.items();
+  emit.entries();
+}
 export async function updateItem(iid, data) {
   Object.assign(store.items.find((i) => i.id === iid), data, {
     nameLower: normalize(data.name), unit: data.unit || null, updatedAt: ts(),
@@ -160,12 +173,6 @@ export async function addEntriesForItems(items) {
       id: item.id, itemId: item.id, name: item.name, note: item.note || null,
       sectionId: item.sectionId, checked: false, addedAt: ts(),
     });
-  });
-  emit.entries();
-}
-export async function addLooseEntry(name, sectionId) {
-  store.entries.push({
-    id: id("entry"), itemId: null, name, sectionId, checked: false, addedAt: ts(),
   });
   emit.entries();
 }

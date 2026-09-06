@@ -1,4 +1,4 @@
-/* MercadoJá — mobile-first, no framework (same approach as 01. app). */
+/* MercadoJá: mobile-first, no framework (same approach as 01. app). */
 
 :root {
   --bg: #f6f7f4;
@@ -196,14 +196,56 @@ input, select { font: inherit; }
 }
 
 .item-row {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+.item-row:last-child { border-bottom: none; }
+
+/* Swipe: .row-fg slides left over .row-bg, which carries the action label.
+   touch-action pan-y keeps vertical scrolling with the browser. */
+.row-fg {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
   min-height: 54px;
+  background: var(--card);
+  touch-action: pan-y;
 }
-.item-row:last-child { border-bottom: none; }
+.row-fg.snap { transition: transform 0.18s ease-out; }
+.item-row.swiping { user-select: none; }
+.item-row.swiping .row-fg { cursor: grabbing; }
+
+.row-bg {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 18px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  background: var(--muito-bg);
+  color: var(--brand);
+}
+.item-row.swiping .row-bg { display: flex; }
+.item-row.removing .row-bg { background: var(--pouco-bg); color: var(--danger); }
+.item-row.armed .row-bg { font-size: 15px; }
+
+.item-row.flash-on .row-fg { animation: rowflash-on 0.5s ease-out; }
+.item-row.flash-off .row-fg { animation: rowflash-off 0.5s ease-out; }
+@keyframes rowflash-on {
+  from { background: var(--muito-bg); }
+  to { background: var(--card); }
+}
+@keyframes rowflash-off {
+  from { background: var(--pouco-bg); }
+  to { background: var(--card); }
+}
 
 .dot {
   width: 12px; height: 12px;
@@ -232,6 +274,20 @@ input, select { font: inherit; }
 }
 .stepper button:active { background: var(--line); }
 .stepper button:disabled { opacity: 0.35; }
+
+.item-cart {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--muted);
+}
+.item-cart svg { width: 20px; height: 20px; }
+.item-cart:active { background: var(--line); }
+.item-cart.on { color: var(--brand); background: var(--muito-bg); }
 
 .item-row .sel { display: none; flex: none; }
 .item-row .sel input { width: 22px; height: 22px; accent-color: var(--brand); }
