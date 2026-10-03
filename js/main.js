@@ -23,7 +23,7 @@ import {
 
 // Shown in Ajustes so anyone can tell which deploy a phone is running.
 // Keep in sync with CACHE in sw.js.
-const APP_VERSION = "v9";
+const APP_VERSION = "v10";
 
 const $ = (id) => document.getElementById(id);
 
@@ -36,6 +36,7 @@ const state = {
   itemsById: new Map(),
   entries: [],
   recipes: [],
+  recipeFavOnly: false,
   tab: "estoque",
   search: "",
   filters: new Set(), // subset of {pouco, medio, muito}
@@ -43,6 +44,7 @@ const state = {
   collapsed: new Set(JSON.parse(localStorage.getItem("mj:collapsed") || "[]")),
   editingItemId: null,
   editingRecipeId: null,
+  draftFavorite: false,
   draftIngredients: [], // [{itemId, name}] while the recipe sheet is open
   ensuredUncat: false,
   seededSections: false,
@@ -71,6 +73,7 @@ function openSheet(id) {
 function closeSheets() {
   $("sheet-backdrop").hidden = true;
   document.querySelectorAll(".sheet").forEach((s) => (s.hidden = true));
+  state.draftFavorite = false;
 }
 
 function fillSectionSelect(select, selectedId) {
@@ -722,13 +725,15 @@ function renderRecipes() {
   listEl.innerHTML = "";
 
   const sorted = [...state.recipes].sort((a, b) =>
+    Number(b.favorite === true) - Number(a.favorite === true) ||
     (a.nameLower || "").localeCompare(b.nameLower || "", "pt")
   );
+  const visible = state.recipeFavOnly ? sorted.filter((r) => r.favorite === true) : sorted;
 
-  if (sorted.length > 0) {
+  if (visible.length > 0) {
     const ul = document.createElement("ul");
     ul.className = "group-items";
-    sorted.forEach((r) => {
+    visible.forEach((r) => {
       const li = document.createElement("li");
       li.className = "recipe-row";
 
@@ -736,6 +741,13 @@ function renderRecipes() {
       name.className = "recipe-name";
       name.textContent = r.name;
       li.appendChild(name);
+      if (r.favorite === true) {
+        const star = document.createElement("span");
+        star.className = "recipe-star";
+        star.setAttribute("aria-label", "Favorita");
+        star.textContent = "★";
+        li.appendChild(star);
+      }
 
       const parts = [];
       const nIng = (r.ingredients || []).length;
@@ -755,12 +767,25 @@ function renderRecipes() {
     listEl.appendChild(ul);
   }
 
+  $("recipe-chips").hidden = sorted.length === 0;
+  $("chip-fav").classList.toggle("on", state.recipeFavOnly);
+  $("chip-fav").setAttribute("aria-pressed", String(state.recipeFavOnly));
   $("recipes-empty").hidden = sorted.length > 0;
+  $("recipes-fav-empty").hidden = sorted.length === 0 || !state.recipeFavOnly || visible.length > 0;
+}
+
+function renderDraftFavorite() {
+  const button = $("btn-recipe-fav");
+  button.textContent = state.draftFavorite ? "★" : "☆";
+  button.setAttribute("aria-pressed", String(state.draftFavorite));
+  button.setAttribute("aria-label", state.draftFavorite ? "Remover dos favoritos" : "Favoritar receita");
 }
 
 function openRecipeSheet(recipeId) {
   state.editingRecipeId = recipeId || null;
   const r = recipeId ? state.recipes.find((x) => x.id === recipeId) : null;
+  state.draftFavorite = r?.favorite === true;
+  renderDraftFavorite();
   $("sheet-recipe-title").textContent = r ? "Editar receita" : "Nova receita";
   $("recipe-name").value = r ? r.name : "";
   $("recipe-text").value = r ? r.text || "" : "";
@@ -923,6 +948,7 @@ function submitRecipeForm(e) {
     name,
     text: $("recipe-text").value.trim(),
     ingredients: state.draftIngredients,
+    favorite: state.draftFavorite,
   };
   const op = state.editingRecipeId
     ? db.updateRecipe(state.editingRecipeId, data)
@@ -1042,6 +1068,7 @@ function buildBackup() {
       name: r.name,
       text: r.text || "",
       ingredients: (r.ingredients || []).map(({ itemId, name }) => ({ itemId, name })),
+      favorite: r.favorite === true,
       createdAt: iso(r.createdAt),
       updatedAt: iso(r.updatedAt),
     })),
@@ -1358,6 +1385,14 @@ function wire() {
 
   // receitas
   $("fab-new-recipe").addEventListener("click", () => openRecipeSheet(null));
+  $("chip-fav").addEventListener("click", () => {
+    state.recipeFavOnly = !state.recipeFavOnly;
+    renderRecipes();
+  });
+  $("btn-recipe-fav").addEventListener("click", () => {
+    state.draftFavorite = !state.draftFavorite;
+    renderDraftFavorite();
+  });
   $("recipe-form").addEventListener("submit", submitRecipeForm);
   $("rec-ing-search").addEventListener("input", renderIngResults);
   $("rec-ing-search").addEventListener("keydown", (e) => {
@@ -1447,7 +1482,10 @@ function wire() {
 function boot() {
   wire();
   $("app-version").textContent = `MercadoJá · ${APP_VERSION}`;
-  if (db === fakeDb) window.__buildBackup = buildBackup; // #debug test hook
+  if (db === fakeDb) {
+    window.__buildBackup = buildBackup;
+    window.__importBackup = (d) => db.importBackup(d);
+  }
 
   // iOS install hint (login screen only, like 01. app)
   const standalone =

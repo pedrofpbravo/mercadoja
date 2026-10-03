@@ -21,11 +21,13 @@ store.recipes.push(
   {
     id: id("recipe"), name: "Strogonoff de frango", nameLower: "strogonoff de frango",
     text: "Frango, creme de leite, molho de tomate, champignon.\nRefogar o frango, juntar o molho e o creme.",
+    favorite: true,
     createdAt: ts(), updatedAt: ts(),
   },
   {
     id: id("recipe"), name: "Arroz de forno", nameLower: "arroz de forno",
     text: "Arroz cozido, queijo, presunto.\nMontar em camadas e gratinar.",
+    favorite: false,
     createdAt: ts(), updatedAt: ts(),
   }
 );
@@ -79,17 +81,17 @@ export async function ensureUncategorized() {
   }
 }
 
-export async function createRecipe({ name, text, ingredients }) {
+export async function createRecipe({ name, text, ingredients, favorite }) {
   store.recipes.push({
     id: id("recipe"), name, nameLower: normalize(name), text: text || "",
-    ingredients: ingredients || [], createdAt: ts(), updatedAt: ts(),
+    ingredients: ingredients || [], favorite: favorite === true, createdAt: ts(), updatedAt: ts(),
   });
   emit.recipes();
 }
-export async function updateRecipe(rid, { name, text, ingredients }) {
+export async function updateRecipe(rid, { name, text, ingredients, favorite }) {
   Object.assign(store.recipes.find((r) => r.id === rid), {
     name, nameLower: normalize(name), text: text || "",
-    ingredients: ingredients || [], updatedAt: ts(),
+    ingredients: ingredients || [], favorite: favorite === true, updatedAt: ts(),
   });
   emit.recipes();
 }
@@ -201,7 +203,7 @@ export async function importBackup(data) {
     else store.items.push(d);
   });
   (data.recipes || []).forEach((r) => {
-    const d = { ...r, nameLower: normalize(r.name), createdAt: ts(), updatedAt: ts() };
+    const d = { ...r, favorite: r.favorite === true, nameLower: normalize(r.name), createdAt: ts(), updatedAt: ts() };
     const cur = store.recipes.find((x) => x.id === r.id);
     if (cur) Object.assign(cur, d);
     else store.recipes.push(d);

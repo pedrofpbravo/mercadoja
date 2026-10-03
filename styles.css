@@ -11,6 +11,9 @@
   --danger: #b91c1c;
   --muito: #16a34a;
   --medio: #d97706;
+  --fav: #f59e0b;
+  --fav-ink: #92400e;
+  --fav-bg: #fef3c7;
   --pouco: #dc2626;
   --muito-bg: #dcfce7;
   --medio-bg: #fef3c7;
@@ -145,7 +148,9 @@ input, select { font: inherit; }
 }
 .chip.pouco.on  { background: var(--pouco-bg); color: var(--pouco); border-color: var(--pouco); }
 .chip.medio.on  { background: var(--medio-bg); color: var(--medio); border-color: var(--medio); }
+.chip.fav.on    { background: var(--fav-bg); color: var(--fav-ink); border-color: var(--fav-ink); }
 .chip.muito.on  { background: var(--muito-bg); color: var(--muito); border-color: var(--muito); }
+#recipe-chips[hidden] { display: none; }
 
 /* selection mode bar */
 .selection-bar {
@@ -362,17 +367,27 @@ input, select { font: inherit; }
 
 /* ---------- receitas ---------- */
 .recipe-row {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 12px;
+  padding: 12px 44px 12px 12px;
   border-bottom: 1px solid var(--line);
   min-height: 54px;
   justify-content: center;
   cursor: pointer;
 }
 .recipe-row:last-child { border-bottom: none; }
-.recipe-name { font-weight: 600; }
+.recipe-name { font-weight: 600; overflow-wrap: anywhere; }
+.recipe-star {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--fav);
+  font-size: 16px;
+  line-height: 1;
+  pointer-events: none;
+}
 .recipe-excerpt {
   font-size: 13px;
   color: var(--muted);
@@ -544,6 +559,19 @@ input, select { font: inherit; }
   box-shadow: 0 -8px 30px rgba(0,0,0,0.18);
 }
 .sheet h3 { margin: 0 0 12px; font-size: 20px; }
+.recipe-sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.recipe-sheet-header h3 { margin: 0; }
+#btn-recipe-fav {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 28px;
+}
+#btn-recipe-fav[aria-pressed="true"] { color: var(--fav); }
 .sheet .hint { margin: -6px 0 14px; }
 .sheet-actions {
   display: flex;

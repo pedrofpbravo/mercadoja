@@ -299,23 +299,25 @@ const cleanIngredients = (list) =>
     .filter((i) => i && i.itemId && i.name)
     .map(({ itemId, name }) => ({ itemId, name }));
 
-export function createRecipe({ name, text, ingredients }) {
+export function createRecipe({ name, text, ingredients, favorite }) {
   return setDoc(doc(collection(fs, "recipes")), {
     name,
     nameLower: normalize(name),
     text: text || "",
     ingredients: cleanIngredients(ingredients),
+    favorite: favorite === true,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
 }
 
-export function updateRecipe(id, { name, text, ingredients }) {
+export function updateRecipe(id, { name, text, ingredients, favorite }) {
   return updateDoc(doc(fs, "recipes", id), {
     name,
     nameLower: normalize(name),
     text: text || "",
     ingredients: cleanIngredients(ingredients),
+    favorite: favorite === true,
     updatedAt: serverTimestamp(),
   });
 }
@@ -370,6 +372,7 @@ export async function importBackup(data) {
       nameLower: normalize(r.name),
       text: r.text || "",
       ingredients: cleanIngredients(r.ingredients),
+      favorite: r.favorite === true,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }]);

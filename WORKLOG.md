@@ -123,3 +123,51 @@ Two adjustments requested:
   vem pré-preenchido com 1; comprando mais, é só digitar o número maior.
 - Gesto testado com PointerEvent sintético no navegador do Claude, não em
   Safari de iPhone real. Vale um teste no aparelho.
+
+## 2026-10-03: v10, receitas favoritas
+
+### Plan (approved by user in a two-round grilling session)
+
+- Field `favorite: boolean` on /recipes docs, shared by both phones
+  (missing field = not favorite). Included in backup export and import.
+- Favoriting only inside the recipe sheet: star button next to the title,
+  part of the form (saved on Salvar, discarded on Cancelar), also on new
+  recipes.
+- Card: small amber star in the top-right corner, only on favorites, not
+  interactive.
+- Chip "★ Favoritas" in the Receitas header, in-memory toggle (not
+  persisted), visible when at least 1 recipe exists.
+- Sort: favorites first, then alphabetical inside each group, no headers.
+- Filtered empty state: "Nenhuma receita favorita ainda. Toque na ☆ de uma
+  receita para favoritar." (user kept this text).
+- Version v9 to v10. Codex runs the tests; Claude reviews only.
+
+### Delegations
+
+- [done] One brief via `codex exec` (codex-cli 0.159.2, workspace-write,
+  brief via stdin). Codex changed index.html, styles.css, js/main.js,
+  js/db.js, js/fakedb.js, sw.js and added a debug-only
+  `window.__importBackup` hook.
+- Codex tests: static checks PASS (same 32 exports in db.js and fakedb.js,
+  71/71 ids present, no dashes added, versions synced). Headless Edge run
+  in #debug: 12/12 PASS (seed stars and order, cancel discards, save adds,
+  rename keeps favorite, create with/without star, chip filter on/off,
+  filtered empty state, empty state with 0 recipes, backup export/import
+  incl. missing field, 375px no overflow and no star overlap, v10 label,
+  zero errors).
+- Caveat: the Codex sandbox had no network, so the Firebase CDN imports in
+  main.js could not load. Codex ran the UI from temporary copies with only
+  the unused realDb import stubbed; debug mode still used fakedb.js.
+
+### Review findings / fixes
+
+- Full diff reviewed against the plan: matches. Global button reset keeps the
+  sheet star unstyled; `#recipe-chips[hidden]` rule needed because `.chips`
+  is display:flex. updateRecipe always writes `favorite`, so edits do not
+  drop it. closeSheets resets the draft.
+- Fixes needed: none.
+
+### Open items
+
+- Firestore path (db.js) reviewed by reading only; check on the real app
+  that favoriting syncs between both iPhones.

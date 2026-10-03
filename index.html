@@ -97,10 +97,12 @@
       <section id="tab-receitas" class="tab" hidden>
         <header class="tab-header">
           <h2>Receitas</h2>
+          <div class="chips" id="recipe-chips" hidden><button type="button" class="chip fav" id="chip-fav" aria-pressed="false">★ Favoritas</button></div>
         </header>
 
         <div id="recipes-list" class="list"></div>
         <p id="recipes-empty" class="empty" hidden>Nenhuma receita ainda. Toque em ＋ para cadastrar a primeira.</p>
+        <p id="recipes-fav-empty" class="empty" hidden>Nenhuma receita favorita ainda. Toque na ☆ de uma receita para favoritar.</p>
 
         <button id="fab-new-recipe" class="fab" aria-label="Nova receita">＋</button>
       </section>
@@ -237,7 +239,10 @@
 
   <!-- Nova / editar receita -->
   <div id="sheet-recipe" class="sheet" hidden>
-    <h3 id="sheet-recipe-title">Nova receita</h3>
+    <div class="recipe-sheet-header">
+      <h3 id="sheet-recipe-title">Nova receita</h3>
+      <button type="button" id="btn-recipe-fav" form="recipe-form" aria-pressed="false" aria-label="Favoritar receita">☆</button>
+    </div>
     <form id="recipe-form">
       <label class="field">
         <span>Nome *</span>
